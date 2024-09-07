@@ -292,6 +292,7 @@ def plot_recent_weight_trend(final_data, days=7):
 
     # filter data for the last given days
     recent_data = final_data.tail(days)
+    recent_data_for_nutrients = final_data.head(days)
 
     # calculate trends
     linear_trend = calculate_polynomial_regression(recent_data, 'Peso', degree=1)
@@ -299,6 +300,27 @@ def plot_recent_weight_trend(final_data, days=7):
 
     # calculate percentage change in weight
     percentage_change = compute_weight_evolution(recent_data)
+
+    # calculate mean calories and protein consumed over the period
+    mean_calories = recent_data_for_nutrients['Calorías(kcal)'].mean()
+    mean_protein = recent_data_for_nutrients['Proteínas(gr)'].mean()
+    disclaimer = "* Nota: El consumo de kcal y proteínas se calcula con los valores de cada día previo a los días del periodo mostrado."
+
+    # get recommendation based on weight evolution
+    recommendation = ''
+    aiming_for_loss = True  # TODO: put this as a parameter when adding 'bulking' features
+    if aiming_for_loss:
+        recommended_weight_loss_interval = ((-0.5 * days) / 7, (-1 * days) / 7)
+        if percentage_change > recommended_weight_loss_interval[0]:
+            # not enough loss --> recommend larger deficit
+            recommended_calories = (mean_calories - (mean_calories * 0.05), mean_calories - (mean_calories * 0.1))
+            recommendation = f"Recomendación: reducir consumo de calorías al intervalo {recommended_calories: .2f}."
+        elif percentage_change >= [1]:
+            # sweet spot for body weight loss --> recommend no adjustment
+            recommendation = f"Recomendación: mantener el mismo consumo de calorías."
+        else:
+            # body weight loss too high
+            recommendation = f"Recomendación: pérdida de peso acelerada, aumentar ligeramente el consumo de calorías."
 
     # create a subplot grid
     fig = plotly.graph_objects.Figure()
@@ -330,9 +352,35 @@ def plot_recent_weight_trend(final_data, days=7):
         line=dict(color='#2ca02c', dash='longdashdot')
     ))
 
+    # add an annotation for the mean calories and protein consumed
+    fig.add_annotation(
+        text=f"Media de kcal consumidas*: {mean_calories:.2f}",
+        xref="paper", yref="paper",
+        x=0.35, y=1.1, showarrow=False,
+        font=dict(size=14)
+    )
+    fig.add_annotation(
+        text=f"Media de proteínas consumidas*: {mean_protein:.2f}",
+        xref="paper", yref="paper",
+        x=0.35, y=1.05, showarrow=False,
+        font=dict(size=14)
+    )
+    fig.add_annotation(
+        text=recommendation,
+        xref="paper", yref="paper",
+        x=1, y=1.1, showarrow=False,
+        font=dict(size=14)
+    )
+    fig.add_annotation(
+        text=disclaimer,
+        xref="paper", yref="paper",
+        x=1, y=1.05, showarrow=False,
+        font=dict(size=14)
+    )
+
     # update layout and x-axis formatting
     fig.update_layout(
-        title=f'Peso en los últimos {days} días (Cambio porcentual: {percentage_change:.2f}%)',
+        title=f'Evolución peso últimos {days} días ({percentage_change:.2f}%)',
         xaxis_title='Fecha',
         yaxis_title='Peso (kg)',
         xaxis=dict(
@@ -385,20 +433,12 @@ def main():
         plot_recent_weight_trend(filtered_data, phases_duration)
 
     elif run_full_analysis_option == '2':
-        maintenance_start_date_input = input('Introduce la fecha de inicio de los datos a mostrar (DD-MM-YYYY): ')
-        list_of_numbers_maintenance_start = maintenance_start_date_input.split('-')
-        deficit_end_date = input('Introduce la fecha de fin de los datos a mostrar (DD-MM-YYYY): ')
-        list_of_numbers_deficit_end = deficit_end_date.split('-')
-        maintenance_start_date = pandas.to_datetime(
-            str(list_of_numbers_maintenance_start[2]) + '-' + str(list_of_numbers_maintenance_start[1]) + '-' + str(
-                list_of_numbers_maintenance_start[0]))
-        deficit_end_date = pandas.to_datetime(
-            str(list_of_numbers_deficit_end[2]) + '-' + str(list_of_numbers_deficit_end[1]) + '-' + str(
-                list_of_numbers_deficit_end[0]))
-        num_days_to_plot = (deficit_end_date - maintenance_start_date).days + 1
+        num_days_to_plot = int(input('Introduce el número de días para mostrar tendencia (min=2): '))
 
         data = read_data(file_path)
-        filtered_data = filter_data_by_date(data, maintenance_start_date, deficit_end_date)
+        end_date = data['Fecha'].max()
+        start_date = end_date - timedelta(days=num_days_to_plot)
+        filtered_data = filter_data_by_date(data, start_date, end_date)
         display_final_table(filtered_data)
         plot_recent_weight_trend(filtered_data, num_days_to_plot)
 
