@@ -292,7 +292,8 @@ def plot_recent_weight_trend(final_data, days=7):
 
     # filter data for the last given days
     recent_data = final_data.tail(days)
-    recent_data_for_nutrients = final_data.head(days)
+    recent_data_for_nutrients = final_data.tail(days + 1)
+    recent_data_for_nutrients = recent_data_for_nutrients[:-1]
 
     # calculate trends
     linear_trend = calculate_polynomial_regression(recent_data, 'Peso', degree=1)
@@ -313,8 +314,9 @@ def plot_recent_weight_trend(final_data, days=7):
         recommended_weight_loss_interval = ((-0.5 * days) / 7, (-1 * days) / 7)
         if percentage_change > recommended_weight_loss_interval[0]:
             # not enough loss --> recommend larger deficit
-            recommended_calories = (mean_calories - (mean_calories * 0.05), mean_calories - (mean_calories * 0.1))
-            recommendation = f"Recomendación: reducir consumo de calorías al intervalo {recommended_calories: .2f}."
+            recommended_calories = (round(mean_calories - (mean_calories * 0.05), 2),
+                                    round(mean_calories - (mean_calories * 0.1), 2))
+            recommendation = f"Recomendación: reducir consumo de calorías al intervalo {recommended_calories}."
         elif percentage_change >= [1]:
             # sweet spot for body weight loss --> recommend no adjustment
             recommendation = f"Recomendación: mantener el mismo consumo de calorías."
